@@ -1,4 +1,5 @@
 import serial
+import time
 from optparse import OptionParser
 
 class PseudoSerial:
@@ -15,21 +16,27 @@ class App(object):
 
         self.parser.add_option("-p",
                                "--port",
-                               action="store_true",
                                dest="port",
                                default="/dev/ttyUSB0",
                                help="Port to lisen on" )
 
         self.parser.add_option("-l",
                                "--lines",
-                               action="store_true",
                                dest="lines",
+                               type="int",
                                default=1000,
                                help="Number of lines to store" )
+
+        
+        self.parser.add_option("-t",
+                               "--time",
+                               dest="time",
+                               type="int",
+                               default=-1,
+                               help="Number of seconds to listen" )
         
         self.parser.add_option("-f",
                                "--file",
-                               action="store_true",
                                dest="file",
                                default="ser.in",
                                help="Filename to save data" )
@@ -38,6 +45,7 @@ class App(object):
 
     def run(self):
         self.parse_commandline()
+        count = 0
 
         ser = PseudoSerial()
         try:
@@ -46,13 +54,21 @@ class App(object):
             print ex
 
         f = open(self.options.file, 'w')
-        for _ in range(self.options.lines):
-            f.write( ser.readline() )
-            
-            
-        
-                
 
+        if self.options.time > 0:
+            start = time.time()
+            while time.time() < ( start + self.options.time ):
+                f.write( ser.readline() )
+                count += 1
+                
+        else:
+            for _ in range(self.options.lines):
+                f.write( ser.readline() )
+                count += 1
+
+        f.close()
+        print "wrote %d lines" % count
+            
             
 if __name__ == "__main__":
     app = App()

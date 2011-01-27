@@ -15,6 +15,8 @@ import math
 from scipy.integrate import trapz
 import numpy as np
 
+from optparse import OptionParser
+
 class Rotations(object):
     def __init__(self):
         self.base_rot = np.array([0, 0, 0])
@@ -64,28 +66,52 @@ class Rotations(object):
             
 
 class PseudoSerial:
+    def __init__(self, file):
+        self.input = open(file)
+        self.time_opened = time.time()
+
+    def __del__(self):
+        self.close()
+        
     def readline(self):
-        return "0 0 0 0 0 0"
+        try:
+            line = self.input.readline()
+            temp = line.split(':')
+            timestamp = float(temp[0])
+            data = temp[1]
+            if time.time() < (self.time_opened + timestamp ):
+                time.sleep( (self.time_opened + timestamp) - time.time() )
+        except:
+            data = "2048 1743 2048 2030 2048 2615 3100 2669 0 0 0 0 0 0 0 0 0 0 0 0"
+        return data
+    
     def close(self):
-        pass
-   
-port = "/dev/ttyUSB0"
-oneG = 70.0
-ser = PseudoSerial()
-try:
-    ser = serial.Serial(port, 115200, timeout=1)
-except serial.SerialException as ex:
-    print ex
+        self.input.close()
+
     
 rtri = rquad = 0.0
 
+
 class Display(object):
     def __init__(self):
+        self.parser = OptionParser(version="%prog 0.1")
+        
+        self.parse_commandline()
+        
         self.rot = Rotations()
         self.last_rot_reset = pygame.time.get_ticks()
 
         self.sum = 0
         self.count = 0
+
+        oneG = 70.0
+        if self.options.file == "":
+            try:
+                self.ser = serial.Serial(self.options.port, 115200, timeout=1)
+            except serial.SerialException as ex:
+                print ex
+        else:
+            self.ser = PseudoSerial(self.options.file)
     
     def resize(self, (width, height)):
         if height==0:
@@ -129,7 +155,7 @@ class Display(object):
         glEnd()
 
     def step(self):
-        line = ser.readline()
+        line = self.ser.readline()
         res = re.findall("(\d+)+", line)
 
         if len(res) > 7:
@@ -178,9 +204,25 @@ class Display(object):
             sys.exit()
 
         self.draw()
+        
+
+    def parse_commandline(self):
+        self.parser.add_option("-f",
+                               "--file",
+                               dest="file",
+                               default="",
+                               help="Serial data to load" )
+        
+        self.parser.add_option("-p",
+                               "--port",
+                               dest="port",
+                               default="/dev/ttyUSB0",
+                               help="Port to lisen on" )
+        
+        (self.options, self.args) = self.parser.parse_args()
+        
 
     def run(self):
-
         video_flags = OPENGL|DOUBLEBUF
 
         pygame.init()
@@ -202,13 +244,10 @@ class Display(object):
             pygame.display.flip()
             frames = frames+1
 
-        ser.close() 
+        self.ser.close() 
         print "fps:  %d" % ((frames*1000)/(pygame.time.get_ticks()-self.ticks))
-
-
-def main():
+    
+if __name__ == '__main__':
     disp = Display()
     disp.run()
-    
-if __name__ == '__main__': main()
 

@@ -55,15 +55,26 @@ class App(object):
 
         f = open(self.options.file, 'w')
 
+        
+        time.sleep(1.5)
+        ser.readline()
+        
+        
         if self.options.time > 0:
             start = time.time()
             while time.time() < ( start + self.options.time ):
-                f.write( ser.readline() )
+                line = "%f:" % ( time.time() - start )
+                line += ser.readline()
+                f.write( line )
+                
                 count += 1
                 
         else:
             for _ in range(self.options.lines):
-                f.write( ser.readline() )
+                line = "%f:" % ( time.time() - start )
+                line += ser.readline()
+                f.write( line )
+                
                 count += 1
 
         f.close()

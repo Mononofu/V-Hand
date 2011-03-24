@@ -14,14 +14,18 @@ import re
 import math
 from scipy.integrate import trapz
 import numpy as np
+from visual import vector
 
 from optparse import OptionParser
 
-class Rotations(object):
-    def __init__(self):
+class Movements(object):
+    def __init__(self, divider = 3333, thresh = 150, damp_factor = -0.2):
         self.base_rot = np.array([0, 0, 0])
         self.last_rots = []
         self.rot_cache = []
+        self.divider = divider
+        self.thresh = thresh
+        self.df = damp_factor
 
     def reset(self, x = 0, y = 0, z = 0):
         self.base_rot = np.array([x*3333, y*3333, z*3333])
@@ -53,13 +57,12 @@ class Rotations(object):
             return np.array([0,0,0])
     
     def add(self, x_rot, y_rot, z_rot, timestamp):
-        thresh = 150
 
-        if abs(x_rot) < thresh:
+        if abs(x_rot) < self.thresh:
             x_rot = 0
-        if abs(y_rot) < thresh:
+        if abs(y_rot) < self.thresh:
             y_rot = 0
-        if abs(z_rot) < thresh:
+        if abs(z_rot) < self.thresh:
             z_rot = 0
         if len(self.last_rots) > 200:
             self.base_rot += self.integrate()
@@ -67,8 +70,10 @@ class Rotations(object):
 
         if len(self.last_rots) > 0:
              l = self.last_rots[-1]
-             df = -0.2  # damp factor
-             self.last_rots.append([x_rot + l[0]*df, y_rot + l[1]*df, z_rot + l[2]*df, timestamp])
+             self.last_rots.append([x_rot + l[0]*self.df,
+                                    y_rot + l[1]*self.df,
+                                    z_rot + l[2]*self.df,
+                                    timestamp])
         else:
             self.last_rots.append([x_rot, y_rot, z_rot, timestamp])
 
@@ -78,7 +83,7 @@ class Rotations(object):
     def get(self):
         if len( self.rot_cache ) == 0:
             self.integrate()
-        return self.rot_cache / 3333
+        return self.rot_cache / self.divider
             
 
 class PseudoSerial:
@@ -114,7 +119,8 @@ class Display(object):
         
         self.parse_commandline()
         
-        self.rot = Rotations()
+        self.rot = Movements()
+        self.acc = Movements(100, 50, 0)
         self.last_rot_reset = pygame.time.get_ticks()
 
         self.sum = 0
@@ -174,6 +180,10 @@ class Display(object):
         glEnd()
 
 
+        glTranslatef(self.acc.get()[0], 0, 0)
+        glTranslatef(0, self.acc.get()[1], 0)
+        glTranslatef(0, 0, self.acc.get()[2])
+
         
         glRotatef(self.rot.get()[0], 0.0, 0.0, 1.0)
         glRotatef(+45, 0, 1, 0)
@@ -199,9 +209,9 @@ class Display(object):
         res = re.findall("(\d+)+", line)
 
         if len(res) > 7:
-            x_acc = float(res[7]) - 2706
-            y_acc = float(res[6]) - 2691
-            z_acc = float(res[5]) - 2691
+            x_acc = float(res[7]) - 2710
+            y_acc = float(res[6]) - 2710
+            z_acc = float(res[5]) - 3245
             
 
             print "gravity: %f : %f : %f" % (x_acc, y_acc, z_acc)
@@ -220,6 +230,13 @@ class Display(object):
             print "rotation: %f : %f : %f" % (x_rot, y_rot, z_rot)
 
             self.rot.add( x_rot, y_rot, z_rot, pygame.time.get_ticks() )
+
+
+            gravity = vector(0, 0, 9.81)
+            x_acc -= gravity.rotate(self.rot.get()[0]/180*math.pi, (1,0,0))
+            y_acc -= gravity.rotate(self.rot.get()[1]/180*math.pi, (0,1,0))
+            z_acc -= gravity.rotate(self.rot.get()[2]/180*math.pi, (0,0,1))
+            self.acc.add( x_acc, y_acc, z_acc, pygame.time.get_ticks() )
 
             """ if self.last_rot_reset < (pygame.time.get_ticks() - 1000):
                 if abs(x_rot) < 10 and abs(y_rot) < 10 and abs(z_rot) < 10:

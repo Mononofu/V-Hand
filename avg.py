@@ -61,7 +61,7 @@ class App(object):
 
             time.sleep(1.5)
             ser.readline()
-            averages = [0 for _ in range(len(ser.readline().replace("\r\n", "").split(" ")))]
+            averages = [0 for _ in range(len(ser.readline().replace(" \r\n", "").split(" ")))]
             counter = 0
         
             begin = time.time()

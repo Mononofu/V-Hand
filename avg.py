@@ -1,5 +1,8 @@
+#!/bin/python
+
 import serial
 import time
+import sys
 from optparse import OptionParser
 
 class PseudoSerial:
@@ -24,8 +27,8 @@ class App(object):
                                "--lines",
                                dest="lines",
                                type="int",
-                               default=1000,
-                               help="Number of lines to store" )
+                               default=-1,
+                               help="Number of lines to listen for" )
 
         
         self.parser.add_option("-t",
@@ -38,38 +41,47 @@ class App(object):
         self.parser.add_option("-f",
                                "--file",
                                dest="file",
-                               default="ser.in",
-                               help="Filename to save data" )
+                               default="",
+                               help="File to read from" )
 
         (self.options, self.args) = self.parser.parse_args()
 
     def run(self):
         self.parse_commandline()
-        count = 0
-
-        ser = PseudoSerial()
-        try:
-            ser = serial.Serial(self.options.port, 115200, timeout=1)
-        except serial.SerialException as ex:
-            print ex
-
-        f = open(self.options.file, 'w')
 
         
-        time.sleep(1.5)
-        ser.readline()
-        
-        start = time.time()
         
         if self.options.time > 0:
-            while time.time() < ( start + self.options.time ):
-                line = "%f:" % ( time.time() - start )
-                line += ser.readline()
-                f.write( line )
-                
-                count += 1
-                
-        else:
+
+            ser = PseudoSerial()
+            try:
+                ser = serial.Serial(self.options.port, 115200, timeout=1)
+            except serial.SerialException as ex:
+                print ex
+
+            time.sleep(1.5)
+            ser.readline()
+            averages = [0 for _ in range(len(ser.readline().replace("\r\n", "").split(" ")))]
+            counter = 0
+        
+            begin = time.time()
+            
+            while time.time() < begin + self.options.time:
+                try:
+                    l = ser.readline()
+                    values = l.replace(" \r\n", "").split(" ")
+                    for i in range(len(values)):
+                        averages[i] += int( values[i] )
+                    counter += 1
+                except ValueError:
+                    pass
+
+            i = 0
+            for v in averages:
+                print "%2d  %4d" % (i, v / counter)
+                i += 1
+            
+        elif self.options.lines > 0:
             for _ in range(self.options.lines):
                 line = "%f:" % ( time.time() - start )
                 line += ser.readline()
@@ -77,8 +89,15 @@ class App(object):
                 
                 count += 1
 
-        f.close()
-        print "wrote %d lines" % count
+            pass
+        elif len(self.options.file) > 0:
+            pass
+        else:
+            self.parser.print_help()
+            sys.exit()
+
+        
+            
             
             
 if __name__ == "__main__":

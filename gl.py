@@ -53,10 +53,26 @@ class Rotations(object):
             return np.array([0,0,0])
     
     def add(self, x_rot, y_rot, z_rot, timestamp):
+        thresh = 150
+
+        if abs(x_rot) < thresh:
+            x_rot = 0
+        if abs(y_rot) < thresh:
+            y_rot = 0
+        if abs(z_rot) < thresh:
+            z_rot = 0
         if len(self.last_rots) > 200:
             self.base_rot += self.integrate()
             self.last_rots = []
-        self.last_rots.append([x_rot, y_rot, z_rot, timestamp])
+
+        if len(self.last_rots) > 0:
+             l = self.last_rots[-1]
+             df = -0.2  # damp factor
+             self.last_rots.append([x_rot + l[0]*df, y_rot + l[1]*df, z_rot + l[2]*df, timestamp])
+        else:
+            self.last_rots.append([x_rot, y_rot, z_rot, timestamp])
+
+        
         self.rot_cache = []
 
     def get(self):
@@ -138,42 +154,61 @@ class Display(object):
         glLoadIdentity()
 
         glLoadIdentity()
+
         glTranslatef(0, 0, -6.0)
 
+        glRotatef(45, 1, 0, 0)
+
+        glBegin(GL_LINES)
+        glColor3f(1.0, 0.0, 0.0)
+        glVertex3f(0.0, 0.0, 0.0)
+        glVertex3f(2.0, 0.0, 0.0)
+        
+        glColor3f(0.0, 1.0, 0.0)
+        glVertex3f(0.0, 0.0, 0.0)
+        glVertex3f(0.0, 2.0, 0.0)
+        
+        glColor3f(0.0, 0.0, 1.0)
+        glVertex3f(0.0, 0.0, 0.0)
+        glVertex3f(0.0, 0.0, 2.0)
+        glEnd()
+
+
+        
         glRotatef(self.rot.get()[0], 0.0, 0.0, 1.0)
+        glRotatef(+45, 0, 1, 0)
+        
         glRotatef(self.rot.get()[1], 1.0, 0.0, 1.0)
+        glRotatef(-45, 0, 1, 0)
         glRotatef(self.rot.get()[2], 0.0, 1.0, 0.0)
-        glRotatef(0, 0.0, 0.0, 1.0)
+
 
         glColor3f(0.5, 0.5, 1.0)
         glBegin(GL_QUADS)
-        glVertex3f(-1.0, 1.0, 1.0)
-        glVertex3f(1.0, 1.0, 1.0)
+        glVertex3f(-1.0, 0.0, 1.0)
+        glVertex3f(1.0, 0.0, 1.0)
         glColor3f(1.0, 0.5, 0.5)
-        glVertex3f(1.0, 1.0, -1.0)
-        glVertex3f(-1.0, 1.0, -1.0)
+        glVertex3f(1.0, 0.0, -1.0)
+        glVertex3f(-1.0, 0.0, -1.0)
         glEnd()
+
+        
 
     def step(self):
         line = self.ser.readline()
         res = re.findall("(\d+)+", line)
 
         if len(res) > 7:
-            x_acc = float(res[5]) - 2615
-            y_acc = float(res[7]) - 2669
-            z_acc = float(res[6]) - 2614
+            x_acc = float(res[7]) - 2706
+            y_acc = float(res[6]) - 2691
+            z_acc = float(res[5]) - 2691
             
-            """self.sum += z_acc
-            self.count += 1
 
-            if self.count > 1000:
-                print self.sum / 1001
-                sys.exit()"""
             print "gravity: %f : %f : %f" % (x_acc, y_acc, z_acc)
 
-            x_rot = (int(res[4]) - 2048)
-            y_rot = (int(res[3]) - 2030)
-            z_rot = (int(res[2]) - 2048)
+            x_rot = (int(res[1]) - 2049)
+            y_rot = (int(res[0]) - 2042)
+            z_rot = (int(res[2]) - 2050)
 
             if abs(x_rot) < 10:
                 x_rot = 0
@@ -186,7 +221,7 @@ class Display(object):
 
             self.rot.add( x_rot, y_rot, z_rot, pygame.time.get_ticks() )
 
-            if self.last_rot_reset < (pygame.time.get_ticks() - 1000):
+            """ if self.last_rot_reset < (pygame.time.get_ticks() - 1000):
                 if abs(x_rot) < 10 and abs(y_rot) < 10 and abs(z_rot) < 10:
                     xrot = yrot = zrot = 0
                     tresh = 0.1
@@ -197,11 +232,11 @@ class Display(object):
                     if abs(x_acc) + abs(y_acc) > tresh:
                         zrot = math.atan2(y_acc, x_acc) / math.pi * 180
                     self.rot.reset(xrot, yrot, zrot)
-                    self.last_rot_reset = pygame.time.get_ticks()
+                    self.last_rot_reset = pygame.time.get_ticks()"""
                 
             print self.rot.get()
         else:
-            sys.exit()
+            pass
 
         self.draw()
         
